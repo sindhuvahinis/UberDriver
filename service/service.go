@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
@@ -32,13 +31,6 @@ type DriverLocation struct {
 	Location  Location
 }
 
-type DriverLocationVersion struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
-	UID       string
-	TimeStamp string
-	Location  Location
-}
-
 type Server struct {
 }
 
@@ -52,7 +44,7 @@ var (
 
 func CreateClientForMongoDB() {
 	// Set client options
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+	clientOptions := options.Client().ApplyURI("mongodb://0.tcp.ngrok.io:18579/")
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(context.TODO(), clientOptions)
