@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package proto;
+
+message User {
+    string uid = 1;
+    string email = 2;
+    string name = 3;
+    int64 lastlogin = 4;
+}
+
+message Response {
+    int32 statusCode = 1;
+    bool isOK = 2;
+    string message = 3;
+}
+
+message LocationRequest {
+    string uid = 1;
+    double lat = 2;
+    double lng = 3;
+    int64 timestamp = 4;
+}
+
+service DriverService {
+    rpc StoreUserLogin(User) returns (Response) {}
+    rpc UpdateLocation(LocationRequest) returns (Response) {}
+}
