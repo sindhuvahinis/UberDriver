@@ -27,7 +27,6 @@ type Location struct {
 }
 
 type DriverLocation struct {
-	ID        primitive.ObjectID `json:"id" bson:"_id"`
 	UID       string
 	TimeStamp int64
 	Location  Location
@@ -45,11 +44,10 @@ type Server struct {
 
 var UserCollection *mongo.Collection
 var DriverLocationCollection *mongo.Collection
-var LocationVersionCollection *mongo.Collection
 
 var (
-	DriverLocationStr        = "DriverLocation"
-	DriverLocationVersionStr = "DriverLocationVersion"
+	DriverLocationStr = "DriverLocation"
+	UserStr           = "Users"
 )
 
 func CreateClientForMongoDB() {
@@ -82,27 +80,13 @@ func CreateClientForMongoDB() {
 	}
 
 	DriverLocationCollection = database.Collection(DriverLocationStr)
+	UserCollection = database.Collection(UserStr)
 	DriverLocationIndexes := DriverLocationCollection.Indexes()
 	_, err = DriverLocationIndexes.CreateOne(context.Background(), driverLocationIndexModel, indexOptions)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//UserCollection = database.Collection("Users")
-	//LocationCollection = database.Collection("Location")
-	//LocationVersionCollection = database.Collection("LocationVersion")
-	//
-	//LocationCollection.Indexes().CreateOne(context.Background(),
-	//	mongo.IndexModel{
-	//		Keys:    bson.M{"Coordinates": 1},
-	//		Options: nil,
-	//	})
-	//
-	//LocationVersionCollection.Indexes().CreateOne(context.Background(), mongo.IndexModel{
-	//	Keys:    bson.M{"Coordinates": 1},
-	//	Options: nil,
-	//})
 }
 
 func (s *Server) StoreUserLogin(ctx context.Context, user *proto.User) (*proto.Response, error) {
@@ -129,12 +113,18 @@ func (s *Server) StoreUserLogin(ctx context.Context, user *proto.User) (*proto.R
 
 func (s *Server) UpdateLocation(ctx context.Context, request *proto.LocationRequest) (*proto.Response, error) {
 
-	driverLocation := DriverLocation{
-		ID:        primitive.ObjectID{},
-		UID:       request.Uid,
-		TimeStamp: request.Timestamp,
-		Location:  NewPoint(request.Lng, request.Lat),
-	}
+	filter := bson.M{"uid": bson.M{"$eq": request.Uid}}
+	update := bson.M{"$set": bson.M{
+		"uid":       request.Uid,
+		"timestamp": request.Timestamp,
+		"location":  NewPoint(request.Lng, request.Lat),
+	}}
+
+	UpdateOptions := options.Update().SetUpsert(true)
+
+	updateResult, _ := DriverLocationCollection.UpdateOne(context.Background(), filter, update, UpdateOptions)
+
+	fmt.Printf("Update new Location. Upserted ID: %v\n", updateResult.UpsertedID)
 
 	return &proto.Response{
 		StatusCode: util.SUCCESS,
@@ -189,8 +179,6 @@ func NewPoint(lng, lat float64) Location {
 }
 
 func AddDriverLocation(driverLocation DriverLocation) interface{} {
-	driverLocation.ID = primitive.NewObjectID()
-
 	insertResult, err := DriverLocationCollection.InsertOne(context.Background(), driverLocation)
 	if err != nil {
 		log.Fatal(err)
