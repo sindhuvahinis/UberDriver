@@ -81,8 +81,9 @@ func CreateClientForMongoDB() {
 		Keys:    bsonx.MDoc{"location": bsonx.String("2dsphere")},
 	}
 
-	DriverLocationCollection := database.Collection(DriverLocationStr).Indexes()
-	_, err = DriverLocationCollection.CreateOne(context.Background(), driverLocationIndexModel, indexOptions)
+	DriverLocationCollection = database.Collection(DriverLocationStr)
+	DriverLocationIndexes := DriverLocationCollection.Indexes()
+	_, err = DriverLocationIndexes.CreateOne(context.Background(), driverLocationIndexModel, indexOptions)
 
 	if err != nil {
 		log.Fatal(err)
@@ -135,12 +136,10 @@ func (s *Server) UpdateLocation(ctx context.Context, request *proto.LocationRequ
 		Location:  NewPoint(request.Lng, request.Lat),
 	}
 
-	AddDriverLocation(driverLocation)
-
 	return &proto.Response{
 		StatusCode: util.SUCCESS,
 		IsOK:       true,
-		Message:    fmt.Sprintf("Inserted location record for the given user id successfully. Inserted ID is %v", insertResult.InsertedID),
+		Message:    fmt.Sprintf("Inserted location record for the given user id successfully"),
 	}, nil
 }
 
