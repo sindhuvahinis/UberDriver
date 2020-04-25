@@ -22,7 +22,25 @@ message LocationRequest {
     int64 timestamp = 4;
 }
 
+message GetLocationRequest {
+    string uid = 1;
+    double sourceLat = 2;
+    double sourceLng = 3;
+}
+
+message DriverDetails {
+    string uid = 1;
+    string email = 2;
+    string name = 3;
+    double driverLat = 4;
+    double driverLong = 5;
+}
+
 service DriverService {
-    rpc StoreUserLogin(User) returns (Response) {}
-    rpc UpdateLocation(LocationRequest) returns (Response) {}
+    rpc StoreUserLogin (User) returns (Response) {
+    }
+    rpc UpdateLocation (LocationRequest) returns (Response) {
+    }
+    rpc GetDriverInLocation (GetLocationRequest) returns (DriverDetails) {
+    }
 }
