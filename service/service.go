@@ -82,24 +82,27 @@ func CreateClientForMongoDB() {
 }
 
 func (s *Server) StoreUserLogin(ctx context.Context, user *proto.User) (*proto.Response, error) {
-	reqUser := User{
-		UID:       user.Uid,
-		Email:     user.Email,
-		Name:      user.Name,
-		LastLogin: user.Lastlogin,
-	}
+	filter := bson.M{"uid": bson.M{"$eq": user.Uid}}
+	update := bson.M{"$set": bson.M{
+		"uid":       user.Uid,
+		"email":     user.Email,
+		"name":      user.Name,
+		"lastlogin": user.Lastlogin,
+	}}
 
-	insertResult, err := UserCollection.InsertOne(context.TODO(), reqUser)
+	UpdateOptions := options.Update().SetUpsert(true)
+
+	updatedResult, err := UserCollection.UpdateOne(context.Background(), filter, update, UpdateOptions)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Inserted a single user record: ", insertResult.InsertedID)
+	fmt.Println("Inserted a single user record: ", updatedResult.UpsertedID)
 
 	return &proto.Response{
 		StatusCode: util.SUCCESS,
 		IsOK:       true,
-		Message:    fmt.Sprintf("Inserted user record successfully. Inserted ID is %v", insertResult.InsertedID),
+		Message:    fmt.Sprintf("Inserted user record successfully. Inserted ID is %v", updatedResult.UpsertedID),
 	}, nil
 }
 
@@ -109,7 +112,7 @@ func (s *Server) UpdateLocation(ctx context.Context, request *proto.LocationRequ
 	update := bson.M{"$set": bson.M{
 		"uid":       request.Uid,
 		"timestamp": request.Timestamp,
-		"location":  NewPoint(request.Lng, request.Lat),
+		"location":  NewLocation(request.Lng, request.Lat),
 	}}
 
 	UpdateOptions := options.Update().SetUpsert(true)
@@ -127,14 +130,14 @@ func (s *Server) UpdateLocation(ctx context.Context, request *proto.LocationRequ
 
 func (s *Server) GetDriverInLocation(ctx context.Context, request *proto.GetLocationRequest) (*proto.DriverDetails, error) {
 
-	location := NewPoint(request.SourceLng, request.SourceLat)
+	location := NewLocation(request.SourceLng, request.SourceLat)
 	var results []DriverLocation
 	filter := bson.D{
 		{"location",
 			bson.D{
 				{"$near", bson.D{
 					{"$geometry", location},
-					{"$maxDistance", 50000},
+					{"$maxDistance", 50000000},
 				}},
 			}},
 	}
@@ -153,44 +156,27 @@ func (s *Server) GetDriverInLocation(ctx context.Context, request *proto.GetLoca
 		results = append(results, driverLoc)
 	}
 
+	fmt.Printf("Results %v ", results[0])
 	driverDetails := results[0]
+
+	var user User
+	err = UserCollection.FindOne(ctx, bson.M{"uid": driverDetails.UID}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
 	return &proto.DriverDetails{
 		Uid:        driverDetails.UID,
-		Email:      "email",
-		Name:       "name",
+		Email:      user.Email,
+		Name:       user.Name,
 		DriverLat:  driverDetails.Location.Coordinates[1],
 		DriverLong: driverDetails.Location.Coordinates[0],
 	}, nil
 }
 
-func NewPoint(lng, lat float64) Location {
+func NewLocation(lng, lat float64) Location {
 	return Location{
 		Type:        "Point",
 		Coordinates: []float64{lng, lat},
 	}
-}
-
-func AddDriverLocation(driverLocation DriverLocation) interface{} {
-	insertResult, err := DriverLocationCollection.InsertOne(context.Background(), driverLocation)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("Inserted new Point. ID: %s\n", insertResult.InsertedID)
-	return insertResult.InsertedID
-}
-
-func UpdateDriverLocation() {
-	//filter := bson.D{{"uid", request.Uid}}
-	//update := bson.D{
-	//	{"$inc", bson.D{
-	//		{"coordinates", [2]float64{request.Lng, request.Lat}}}},
-	//}
-	//
-	//updateResult, err := DriverLocationCollection.UpdateOne(context.TODO(), filter, update)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//fmt.Printf("Matched %v documents and updated %v documents.\n", updateResult.MatchedCount, updateResult.ModifiedCount)
 }
