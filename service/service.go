@@ -44,7 +44,7 @@ var (
 
 func CreateClientForMongoDB() {
 	// Set client options
-	clientOptions := options.Client().ApplyURI("mongodb://0.tcp.ngrok.io:18579/")
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
 
 	// Connect to MongoDB
 	client, err := mongo.Connect(context.TODO(), clientOptions)
