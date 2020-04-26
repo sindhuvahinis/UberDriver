@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 	"log"
+	"sort"
 	"time"
 )
 
@@ -29,6 +30,12 @@ type DriverLocation struct {
 	UID       string
 	TimeStamp int64
 	Location  Location
+	distance  float64
+}
+
+type Distance struct {
+	calculated float64
+	location   Location
 }
 
 type Server struct {
@@ -132,31 +139,37 @@ func (s *Server) GetDriverInLocation(ctx context.Context, request *proto.GetLoca
 
 	location := NewLocation(request.SourceLng, request.SourceLat)
 	var results []DriverLocation
-	filter := bson.D{
-		{"location",
-			bson.D{
-				{"$near", bson.D{
-					{"$geometry", location},
-					{"$maxDistance", 50000000},
-				}},
-			}},
+	filter2 := bson.D{
+		{"$geoNear", bson.D{
+			{"near", location},
+			{"distanceField", "distance"},
+			{"maxDistance", 50000},
+			{"spherical", true},
+		}},
 	}
 
-	cur, err := DriverLocationCollection.Find(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	for cur.Next(ctx) {
-		var driverLoc DriverLocation
-		err := cur.Decode(&driverLoc)
-		if err != nil {
-			fmt.Println("Could not decode Point")
-			return nil, err
-		}
-		results = append(results, driverLoc)
+	curGeoNear, err := DriverLocationCollection.Aggregate(context.Background(), mongo.Pipeline{filter2})
+	var geoDriverCoordinates []bson.M
+	if err = curGeoNear.All(ctx, &results); err != nil {
+		log.Fatal(err)
 	}
 
-	fmt.Printf("Results %v ", results[0])
+	curGeoNear, err = DriverLocationCollection.Aggregate(context.Background(), mongo.Pipeline{filter2})
+	if err = curGeoNear.All(ctx, &geoDriverCoordinates); err != nil {
+		log.Fatal(err)
+	}
+
+	for index, result := range geoDriverCoordinates {
+		results[index].distance = result["distance"].(float64)
+		fmt.Println(result["distance"].(float64))
+	}
+
+	fmt.Println("Results are ... ")
+	fmt.Println(results)
+
+	sort.SliceStable(results, func(i, j int) bool {
+		return results[i].distance < results[j].distance
+	})
 	driverDetails := results[0]
 
 	var user User
@@ -171,6 +184,7 @@ func (s *Server) GetDriverInLocation(ctx context.Context, request *proto.GetLoca
 		Name:       user.Name,
 		DriverLat:  driverDetails.Location.Coordinates[1],
 		DriverLong: driverDetails.Location.Coordinates[0],
+		Distance:   driverDetails.distance,
 	}, nil
 }
 
